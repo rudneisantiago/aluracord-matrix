@@ -1,57 +1,77 @@
 import { Box, Text, TextField, Image, Button } from "@skynexui/components";
 import React from "react";
 import appConfig from "../config.json";
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
+import { useRouter } from "next/router";
 
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzU3MDE3NCwiZXhwIjoxOTU5MTQ2MTc0fQ.cQxB_pAAEKFSlt29v27DFRSiFX8-YV2mGpGx10nbvVI';
-const SUPABASE_URL = 'https://ylesdbhsbjefmtcsdjby.supabase.co';
+import { ButtonSendSticker } from "../src/components/ButtonSendSticker";
+
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzU3MDE3NCwiZXhwIjoxOTU5MTQ2MTc0fQ.cQxB_pAAEKFSlt29v27DFRSiFX8-YV2mGpGx10nbvVI";
+const SUPABASE_URL = "https://ylesdbhsbjefmtcsdjby.supabase.co";
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function escutaMensagensEmTempoReal(adicionaMensagem) {
+  return supabaseClient
+          .from('mensagens')
+          .on('INSERT', (novaMensagem) => {
+            adicionaMensagem(novaMensagem.new);
+          })
+          .subscribe();
+}
 
 export default function ChatPage() {
   // Sua lógica vai aqui
+
+  const roteamento = useRouter();
+  const usuariologado = roteamento.query.username;
 
   const [mensagem, setMensagem] = React.useState("");
   const [listaMensagens, setListaMensagens] = React.useState([]);
 
   React.useEffect(() => {
     supabaseClient
-      .from('mensagens')
-      .select('*')
-      .order('id', {ascending: false})
+      .from("mensagens")
+      .select("*")
+      .order("id", { ascending: false })
       .then(({ data }) => {
-        console.log('response:' ,data);
         setListaMensagens(data);
       });
+
+    escutaMensagensEmTempoReal((novaMensagem) => {
+      setListaMensagens((valorAtualDaLista) => {
+          return [
+            novaMensagem,
+            ...valorAtualDaLista
+          ]
+        }
+      );
+    });
   }, []);
 
   function handleNovaMensagem(novaMensagem) {
     const mensagem = {
-      de: "rudneisantiago",
+      de: usuariologado,
       texto: novaMensagem,
     };
 
     supabaseClient
-      .from('mensagens')
-      .insert([
-        mensagem
-      ])
-      .then(({data}) => {
-        setListaMensagens([
-          data[0],
-          ...listaMensagens,
-        ]);
+      .from("mensagens")
+      .insert([mensagem])
+      .then(({ data }) => {
+        console.log(data);
       });
 
-    setMensagem('');
+    setMensagem("");
   }
 
   const apagarMensagem = (e) => {
-    const { value } = e.target
-    const filter = item => {
-      return item.id != value
-    }
+    const { value } = e.target;
+    const filter = (item) => {
+      return item.id != value;
+    };
     setListaMensagens(listaMensagens.filter(filter));
-  }
+  };
 
   // ./Sua lógica vai aqui
   return (
@@ -95,7 +115,10 @@ export default function ChatPage() {
             padding: "16px",
           }}
         >
-          <MessageList mensagens={listaMensagens} apagarMensagem={apagarMensagem} />
+          <MessageList
+            mensagens={listaMensagens}
+            apagarMensagem={apagarMensagem}
+          />
 
           <Box
             as="form"
@@ -130,9 +153,14 @@ export default function ChatPage() {
               }}
             />
             <Button
-              label={'Enviar'}
+              label={"Enviar"}
               onClick={() => {
                 handleNovaMensagem(mensagem);
+              }}
+            />
+            <ButtonSendSticker
+              onStickerClick={(sticker) => {
+                handleNovaMensagem(':sticker:' + sticker)
               }}
             />
           </Box>
@@ -222,11 +250,17 @@ function MessageList(props) {
                 {new Date().toLocaleDateString()}
               </Text>
             </Box>
-            {mensagem.texto}
+
+            {mensagem.texto.startsWith(":sticker:") ? (
+              <Image src={mensagem.texto.replace(":sticker:", "")} />
+            ) : (
+              mensagem.texto
+            )}
+            {/* {mensagem.texto} */}
             <Button
               variant="tertiary"
               colorVariant="neutral"
-              label='x'
+              label="x"
               value={mensagem.id}
               onClick={(event) => apagarMensagem(event)}
             />
